@@ -24,20 +24,22 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif ()
 
 # Options.
-option(BUILD_LOGTAIL "Build Logtail executable and tools" ON)
+option(BUILD_LOGTAIL "Build Logtail executable and tools" OFF)
 # Used under the Android environment.
-option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library")
+option(BUILD_LOGTAIL_SHARED_LIBRARY "Build Logtail shared library" ON)
 option(ENABLE_ENTERPRISE "enable enterprise feature")
 cmake_dependent_option(ENABLE_COMPATIBLE_MODE "Build Logtail in compatible mode (for low version Linux)" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_STATIC_LINK_CRT "Build Logtail by linking CRT statically" OFF "LINUX" OFF)
 cmake_dependent_option(ENABLE_CORP_FEATURE "Enable corp feature" OFF "ENABLE_ENTERPRISE" OFF)
 option(WITHOUTGDB "Build Logtail without gdb")
-option(WITHSPL "Build Logtail and UT with SPL" ON)
+option(WITHSPL "Build Logtail and UT with SPL" OFF)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
 option(BUILD_LOGTAIL_UT_WITH_BENCHMARK "Build unit test for benchmark" OFF)
 cmake_dependent_option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" ON "CMAKE_BUILD_TYPE STREQUAL Debug;NOT ANDROID" OFF)
 set(PROVIDER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/provider CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
 set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
+#set(JAVA_HOME,/opt/jdk1.8.0_202)
+
 
 # Option to enable/disable treating warnings as errors
 option(ENABLE_WERROR "Treat warnings as errors" ON)
@@ -74,6 +76,15 @@ add_definitions(-DXXH_DISPATCH_AVX512=0)
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+
+    # 核心修复1：全局强制动态TLS，解决JNI静态TLS内存溢出
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ftls-model=global-dynamic")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftls-model=global-dynamic")
+
+    # 核心修复2：链接层强制扩容TLS、兼容第三方静态库自带static tls
+    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--increase-static-tls=65536")
+    #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--increase-static-tls=65536")
+
     if (ENABLE_WERROR)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
@@ -162,11 +173,19 @@ if (LINUX)
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
+     # 手动设置JDK 路径
+    set(JNI_INCLUDE_DIRS ${JAVA_HOME}/include ${JAVA_HOME}/include/linux)
+
 elseif(MSVC)
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
 endif()
+
+# 手动设置JDK 路径
+#set(JNI_INCLUDE_DIRS ${JAVA_HOME}/include ${JAVA_HOME}/include/linux)
+# 添加JNI头文件路径到项目
+include_directories(${JNI_INCLUDE_DIRS})
 
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

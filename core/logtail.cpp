@@ -24,6 +24,12 @@
 #include "common/Flags.h"
 #include "common/version.h"
 #include "logger/Logger.h"
+#include <iostream>
+#include <jni.h>
+#include <string>
+#include <sstream>
+#include "com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin.h"
+#include "snc_agent.h"
 
 using namespace logtail;
 
@@ -49,6 +55,8 @@ DECLARE_FLAG_INT32(data_server_port);
 DECLARE_FLAG_BOOL(enable_env_ref_in_config);
 DECLARE_FLAG_BOOL(enable_sls_metrics_format);
 DECLARE_FLAG_BOOL(logtail_mode);
+
+JNIEnv *sncAgentJNIEnv; // 定义全局JNIEnv指针
 
 void HandleSigtermSignal(int signum, siginfo_t* info, void* context) {
     LOG_INFO(sLogger, ("received signal", "SIGTERM"));
@@ -168,3 +176,32 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
+JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart(JNIEnv *env, jclass clazz){
+    std::cout << "LoongcollectorPlugin started!" << std::endl;
+
+    sncAgentJNIEnv = env; // 初始化全局JNIEnv指针
+    std::cout << "初始化全局sncAgentJNIEnv指针" << std::endl;
+
+    const char* arg_array[] = {
+        "./loongcollector",  // 程序名
+        "--conf_dir=/home/shsnc/zhang/loongcollector-custom/conf",  // 配置目录参数
+        "--logs_dir=/home/shsnc/zhang/loongcollector-custom/logs",  // 日志目录参数
+        "--data_dir=/home/shsnc/zhang/loongcollector-custom/data",  // 数据目录参数
+        "--run_dir=/home/shsnc/zhang/loongcollector-custom/run",  // 运行目录参数
+        "--third_party_dir=/home/shsnc/zhang/loongcollector-custom/third_party",
+        NULL       // 必须
+    };
+    int argc = sizeof(arg_array)/sizeof(arg_array[0]) - 1;
+    char** argv = const_cast<char**>(arg_array);
+        
+    main(argc, argv);
+    //do_worker_process();
+    std::cout << "Loongcollector started" << std::endl;
+    //sncAgentSend();
+}
+
+JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStop(JNIEnv *, jclass){
+    std::cout << "LoongcollectorPlugin stopped!" << std::endl;
+}
+
