@@ -65,6 +65,7 @@ DEFINE_FLAG_STRING(logs_dir, "loongcollector log dir", "log");
 DEFINE_FLAG_STRING(data_dir, "loongcollector data dir", "data");
 DEFINE_FLAG_STRING(run_dir, "loongcollector run dir", "run");
 DEFINE_FLAG_STRING(third_party_dir, "loongcollector third party dir", "thirdparty");
+DEFINE_FLAG_STRING(work_dir, "loongcollector work dir", "");
 
 // ebpf event retry flags
 DEFINE_FLAG_INT32(ebpf_event_retry_interval_sec, "Time in seconds between ebpf event retries", 2);

@@ -98,6 +98,9 @@ void Application::Init() {
     string processExecutionDir = GetProcessExecutionDir();
     AppConfig::GetInstance()->SetProcessExecutionDir(processExecutionDir);
     string newWorkingDir = processExecutionDir + ILOGTAIL_VERSION;
+    if(STRING_FLAG(work_dir).length() > 0) {
+        newWorkingDir = STRING_FLAG(work_dir);
+    }
 #ifdef _MSC_VER
     int chdirRst = _chdir(newWorkingDir.c_str());
 #else

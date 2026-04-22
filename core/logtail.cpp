@@ -177,27 +177,44 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart(JNIEnv *env, jclass clazz){
+JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart(JNIEnv *env, jclass clazz, jstring homePath) {
     std::cout << "LoongcollectorPlugin started!" << std::endl;
 
     sncAgentJNIEnv = env; // 初始化全局JNIEnv指针
     std::cout << "初始化全局sncAgentJNIEnv指针" << std::endl;
 
+    jboolean isCopy;
+    const char *basePath = env->GetStringUTFChars(homePath, &isCopy); //UTF-8
+
+    std::string workDir = "--work_dir=" + std::string(basePath);
+    std::string conf = "--conf_dir=" + std::string(basePath) + "/conf";
+    std::string logs = "--logs_dir=" + std::string(basePath) + "/logs";
+    std::string data = "--data_dir=" + std::string(basePath) + "/data";
+    std::string run = "--run_dir=" + std::string(basePath) + "/run";
+    std::string third_party = "--third_party_dir=" + std::string(basePath) + "/third_party";
+
     const char* arg_array[] = {
         "./loongcollector",  // 程序名
-        "--conf_dir=/home/shsnc/zhang/loongcollector-custom/conf",  // 配置目录参数
-        "--logs_dir=/home/shsnc/zhang/loongcollector-custom/logs",  // 日志目录参数
-        "--data_dir=/home/shsnc/zhang/loongcollector-custom/data",  // 数据目录参数
-        "--run_dir=/home/shsnc/zhang/loongcollector-custom/run",  // 运行目录参数
-        "--third_party_dir=/home/shsnc/zhang/loongcollector-custom/third_party",
+        workDir.c_str(),  // 工作目录参数
+        conf.c_str(),  // 配置目录参数
+        logs.c_str(),  // 日志目录参数
+        data.c_str(),  // 数据目录参数
+        run.c_str(),  // 运行目录参数
+        third_party.c_str(),
         NULL       // 必须
     };
     int argc = sizeof(arg_array)/sizeof(arg_array[0]) - 1;
     char** argv = const_cast<char**>(arg_array);
-        
+
+    std::cout << "命令行参数列表: argc=" << argc << std::endl;
+    for (size_t i = 0; arg_array[i] != NULL; i++)
+    {
+        std::cout << "arg[" << i << "]: " << arg_array[i] << std::endl;
+    }
+    
     main(argc, argv);
     //do_worker_process();
-    std::cout << "Loongcollector started" << std::endl;
+    std::cout << "Loongcollector main started" << std::endl;
     //sncAgentSend();
 }
 

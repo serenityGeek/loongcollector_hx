@@ -22,6 +22,8 @@ make plugin_local # 每次更新插件代码后从这里开始
 export LD_PRELOAD=/home/shsnc/zhang/loongcollector-custom/libloongcollector.so
 java -Djava.library.path=/home/shsnc/zhang/loongcollector-custom -cp /home/shsnc/zhang/loongcollector-custom/bin com.shsnc.agent.plugin.loongcollector.LoongcollectorPlugin
 
+##6 编译产出
+cp -a ./core/build/libloongcollector.so ./output ; cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output ; cp -a core/build/ebpf/driver/libeBPFDriver.so ./output ; cp  core/build/_thirdparty/coolbpf/src/libcoolbpf.so ./output
 
 
 java -cp /Users/zhangchaozhi/data/vscode_workspace/snc-agent-loongcollector-plugin/bin com.shsnc.agent.plugin.loongcollector.LoongcollectorPlugin
