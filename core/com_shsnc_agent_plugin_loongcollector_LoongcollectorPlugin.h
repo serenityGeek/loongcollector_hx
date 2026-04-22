@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin
  * Method:    loogcollectorStart
- * Signature: ()V
+ * Signature: (Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jstring);
 
 /*
  * Class:     com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin
