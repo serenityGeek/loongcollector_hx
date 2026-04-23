@@ -28,6 +28,7 @@
 #include "common/CrashBackTraceUtil.h"
 #include "common/EnvUtil.h"
 #include "common/Flags.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
