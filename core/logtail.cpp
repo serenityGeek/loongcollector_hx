@@ -33,6 +33,12 @@
 
 using namespace logtail;
 
+// ============================
+//  SHSNC JNI 全局变量（必须放在最前面）
+// ============================
+static JavaVM* g_jvm = nullptr;
+static std::mutex g_jni_call_mutex;
+
 #ifdef ENABLE_COMPATIBLE_MODE
 extern "C" {
 #include <string.h>
@@ -56,7 +62,6 @@ DECLARE_FLAG_BOOL(enable_env_ref_in_config);
 DECLARE_FLAG_BOOL(enable_sls_metrics_format);
 DECLARE_FLAG_BOOL(logtail_mode);
 
-JNIEnv *sncAgentJNIEnv; // 定义全局JNIEnv指针
 
 void HandleSigtermSignal(int signum, siginfo_t* info, void* context) {
     LOG_INFO(sLogger, ("received signal", "SIGTERM"));
@@ -177,11 +182,15 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+// ============================
+//  JNI 方法
+// ============================
 JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart(JNIEnv *env, jclass clazz, jstring homePath) {
     std::cout << "LoongcollectorPlugin started!" << std::endl;
 
-    sncAgentJNIEnv = env; // 初始化全局JNIEnv指针
-    std::cout << "初始化全局sncAgentJNIEnv指针" << std::endl;
+    // 保存 JavaVM（全局唯一线程安全对象）
+    env->GetJavaVM(&g_jvm);
+    std::cout << "初始化全局 g_jvm 成功" << std::endl;
 
     jboolean isCopy;
     const char *basePath = env->GetStringUTFChars(homePath, &isCopy); //UTF-8
@@ -211,14 +220,123 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_Loongcollector
     {
         std::cout << "arg[" << i << "]: " << arg_array[i] << std::endl;
     }
-    
+
     main(argc, argv);
-    //do_worker_process();
     std::cout << "Loongcollector main started" << std::endl;
-    //sncAgentSend();
 }
 
 JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStop(JNIEnv *, jclass){
     std::cout << "LoongcollectorPlugin stopped!" << std::endl;
 }
 
+// ============================
+//  获取线程安全的 JNIEnv
+//  SHSNC JNI 线程安全终极版
+//  解决：SIGSEGV、栈溢出、跨线程崩溃
+// ============================
+static JNIEnv* getThreadJNIEnv() {
+    if (!g_jvm) {
+        std::cerr << "[SHSNC-JNI] g_jvm is null" << std::endl;
+        return nullptr;
+    }
+
+    JNIEnv* env = nullptr;
+    jint result = g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+
+    if (result == JNI_EDETACHED) {
+        JavaVMAttachArgs args;
+        args.version = JNI_VERSION_1_6;
+        args.name = (char*)"shsnc-agent-sender";
+        args.group = nullptr;
+
+        // 修复类型强转问题
+        jint attach_ret = g_jvm->AttachCurrentThread((void**)&env, &args);
+        if (attach_ret != 0) {
+            std::cerr << "[SHSNC-JNI] AttachCurrentThread failed: " << attach_ret << std::endl;
+            return nullptr;
+        }
+    }
+    return env;
+}
+
+// ============================
+//  线程安全发送（给Go调用）
+// ============================
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void sncAgentSendData(const char* data, int dataLen) {
+    if (!g_jvm || !data || dataLen <= 0) {
+        return;
+    }
+
+    std::cout << "[SHSNC-JNI] sncAgentSendData called, dataLen=" << dataLen << std::endl;
+
+    std::lock_guard<std::mutex> lock(g_jni_call_mutex);
+    JNIEnv* env = getThreadJNIEnv();
+    if (!env) {
+        return;
+    }
+
+    std::cout << "[SHSNC-JNI] Obtained JNIEnv for current thread" << std::endl;
+
+    jclass cls = nullptr;
+    jbyteArray j_bytes = nullptr;
+    jmethodID mid = nullptr;
+
+    try {
+        // 1. 查找类
+        cls = env->FindClass("com/shsnc/agent/plugin/loongcollector/LoongcollectorPlugin");
+        if (!cls || env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return;
+        }
+
+        std::cout << "[SHSNC-JNI] Found Java class LoongcollectorPlugin" << std::endl;
+
+        // 2. 获取正确方法：sncAgentSendMessage(byte[])
+        mid = env->GetStaticMethodID(cls, "sncAgentSendMessage", "([B)V");
+        if (!mid || env->ExceptionCheck()) {
+            env->ExceptionClear();
+            if (cls) env->DeleteLocalRef(cls);
+            return;
+        }
+
+        std::cout << "[SHSNC-JNI] Found method sncAgentSendMessage(byte[])" << std::endl;
+
+        // 3. 创建字节数组
+        j_bytes = env->NewByteArray(dataLen);
+        if (!j_bytes || env->ExceptionCheck()) {
+            env->ExceptionClear();
+            if (cls) env->DeleteLocalRef(cls);
+            return;
+        }
+        env->SetByteArrayRegion(j_bytes, 0, dataLen, (const jbyte*)data);
+
+        std::cout << "[SHSNC-JNI] Created Java byte array for data, len=" << dataLen << std::endl;
+
+        // 4. 调用Java
+        env->CallStaticVoidMethod(cls, mid, j_bytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+
+        std::cout << "[SHSNC-JNI] Called Java method sncAgentSendMessage" << std::endl;
+
+    } catch (...) {
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+    }
+
+    // 统一释放引用（关键：防止内存泄漏）
+    if (j_bytes) env->DeleteLocalRef(j_bytes);
+    if (cls) env->DeleteLocalRef(cls);
+
+    std::cout << "[SHSNC-JNI] Finished sncAgentSendData" << std::endl;
+}
+
+#ifdef __cplusplus
+}
+#endif

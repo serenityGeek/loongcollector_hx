@@ -47,7 +47,12 @@ cp -a ./core/build/libloongcollector.so ./output ; cp -a ./core/build/go_pipelin
 java -Xss2m -XX:+UseSerialGC -XX:+UnlockDiagnosticVMOptions -XX:NativeMemoryTracking=detail -Djdk.nativeThreadStackSize=2097152 -Djava.library.path=/home/shsnc/zhang/loongcollector-custom -cp /home/shsnc/zhang/loongcollector-custom/bin com.shsnc.agent.plugin.loongcollector.LoongcollectorPlugin
 
 
+export LD_PRELOAD=/home/shsnc/zhang/loongcollector-custom/libloongcollector.so:/home/shsnc/zhang/loongcollector-custom/libGoPluginBase.so:/home/shsnc/zhang/loongcollector-custom/libGoPluginAdapter.so:/home/shsnc/zhang/loongcollector-custom//home/shsnc/zhang/loongcollector-custom/:/home/shsnc/zhang/loongcollector-custom/libcoolbpf.so
+
 cmake .. -DBUILD_LOGTAIL=OFF -DBUILD_LOGTAIL_SHARED_LIBRARY=ON -DJAVA_HOME=/opt/jdk1.8.0_202
 
 
+export LD_LIBRARY_PATH=/home/shsnc/zhang/loongcollector-custom/:$LD_LIBRARY_PATH
 
+
+export LD_LIBRARY_PATH=/lib:/usr/lib:/home/shsnc/zhang/loongcollector-custom/:$LD_LIBRARY_PATH
