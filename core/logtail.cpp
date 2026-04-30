@@ -231,8 +231,8 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCol
 }
 
 JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor_loogcollectorStop(JNIEnv *, jclass){
-    std::cout << "LoongcollectorProcessor stopped!" << std::endl;
     Application::GetInstance()->SetSigTermSignalFlag(true);
+    std::cout << "LoongcollectorProcessor stopped!" << std::endl;
 }
 
 // ============================
