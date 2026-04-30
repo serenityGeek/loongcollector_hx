@@ -28,7 +28,7 @@
 #include <jni.h>
 #include <string>
 #include <sstream>
-#include "com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin.h"
+#include "com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor.h"
 #include "snc_agent.h"
 
 using namespace logtail;
@@ -40,7 +40,7 @@ static JavaVM* g_jvm = nullptr;
 static std::mutex g_jni_call_mutex;
 
 // ✨ 新增：缓存Java类和方法ID
-static jclass g_loongcollector_plugin_class = nullptr;
+static jclass g_loongcollector_processor_class = nullptr;
 static jmethodID g_send_message_method = nullptr;
 static std::once_flag g_jni_init_flag;
 
@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 // ============================
 //  JNI 方法
 // ============================
-JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStart(JNIEnv *env, jclass clazz, jstring homePath) {
+JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor_loogcollectorStart(JNIEnv *env, jclass clazz, jstring homePath) {
     std::cout << "LoongcollectorPlugin started!" << std::endl;
 
     // 保存 JavaVM（全局唯一线程安全对象）
@@ -230,9 +230,9 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_Loongcollector
     std::cout << "Loongcollector main started" << std::endl;
 }
 
-JNIEXPORT void JNICALL Java_com_shsnc_agent_plugin_loongcollector_LoongcollectorPlugin_loogcollectorStop(JNIEnv *, jclass){
-    std::cout << "LoongcollectorPlugin stopped!" << std::endl;
-    //cleanupJNICache(getThreadJNIEnv());
+JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor_loogcollectorStop(JNIEnv *, jclass){
+    std::cout << "LoongcollectorProcessor stopped!" << std::endl;
+    Application::GetInstance()->SetSigTermSignalFlag(true);
 }
 
 // ============================
@@ -276,26 +276,26 @@ static void initJNICache(JNIEnv* env) {
         }
 
         // 1. 查找类并转换为全局引用
-        jclass localCls = env->FindClass("com/shsnc/agent/plugin/loongcollector/LoongcollectorPlugin");
+        jclass localCls = env->FindClass("com/shsnc/agent/ivory/plugin/loongcollector/LoongCollectorProcessor");
         if (!localCls || env->ExceptionCheck()) {
             std::cerr << "[SHSNC-JNI] initJNICache: FindClass failed" << std::endl;
             env->ExceptionClear();
             return;
         }
 
-        g_loongcollector_plugin_class = static_cast<jclass>(env->NewGlobalRef(localCls));
+        g_loongcollector_processor_class = static_cast<jclass>(env->NewGlobalRef(localCls));
         env->DeleteLocalRef(localCls);
 
-        if (!g_loongcollector_plugin_class) {
+        if (!g_loongcollector_processor_class) {
             std::cerr << "[SHSNC-JNI] initJNICache: NewGlobalRef failed" << std::endl;
             return;
         }
 
-        std::cout << "[SHSNC-JNI] Created global ref for LoongcollectorPlugin class" << std::endl;
+        std::cout << "[SHSNC-JNI] Created global ref for LoongcollectorProcessor class" << std::endl;
 
         // 2. 获取方法ID并缓存
         g_send_message_method = env->GetStaticMethodID(
-            g_loongcollector_plugin_class, 
+            g_loongcollector_processor_class, 
             "sncAgentSendMessage", 
             "([B)V"
         );
@@ -303,9 +303,9 @@ static void initJNICache(JNIEnv* env) {
         if (!g_send_message_method || env->ExceptionCheck()) {
             std::cerr << "[SHSNC-JNI] initJNICache: GetStaticMethodID failed" << std::endl;
             env->ExceptionClear();
-            if (g_loongcollector_plugin_class) {
-                env->DeleteGlobalRef(g_loongcollector_plugin_class);
-                g_loongcollector_plugin_class = nullptr;
+            if (g_loongcollector_processor_class) {
+                env->DeleteGlobalRef(g_loongcollector_processor_class);
+                g_loongcollector_processor_class = nullptr;
             }
             return;
         }
@@ -322,9 +322,9 @@ static void initJNICache(JNIEnv* env) {
 //         return;
 //     }
 
-//     if (g_loongcollector_plugin_class) {
-//         env->DeleteGlobalRef(g_loongcollector_plugin_class);
-//         g_loongcollector_plugin_class = nullptr;
+//     if (g_loongcollector_processor_class) {
+//         env->DeleteGlobalRef(g_loongcollector_processor_class);
+//         g_loongcollector_processor_class = nullptr;
 //     }
 
 //     g_send_message_method = nullptr;
@@ -357,7 +357,7 @@ void sncAgentSendData(const char* data, int dataLen) {
     initJNICache(env);
 
         // 检查缓存是否有效
-    if (!g_loongcollector_plugin_class || !g_send_message_method) {
+    if (!g_loongcollector_processor_class || !g_send_message_method) {
         std::cerr << "[SHSNC-JNI] sncAgentSendData: JNI cache not initialized" << std::endl;
         return;
     }
@@ -376,7 +376,7 @@ void sncAgentSendData(const char* data, int dataLen) {
         //std::cout << "[SHSNC-JNI] Created Java byte array for data, len=" << dataLen << std::endl;
 
         // 调用Java方法（使用缓存的类和方法ID）
-        env->CallStaticVoidMethod(g_loongcollector_plugin_class, g_send_message_method, j_bytes);
+        env->CallStaticVoidMethod(g_loongcollector_processor_class, g_send_message_method, j_bytes);
         if (env->ExceptionCheck()) {
             env->ExceptionClear();
         }
