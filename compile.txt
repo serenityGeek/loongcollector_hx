@@ -1,8 +1,12 @@
+##0 镜像是 multi-arch manifest镜像，会自动根据机器的amd64/aarch64架构拉去对应的版本
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15
 
-
 ##1 运行容器
+#### amd64
 docker run --name loongcollector-build-2.1.15 -d -v /home/shsnc/zhang/snc-agent-loogcollector-plugin/loongcollector:/loongcollector -w /loongcollector sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 bash -c "sleep infinity"
+
+#### aarch64
+docker run --name loongcollector-build-2.1.15 -d -v /Users/zhangchaozhi/data/github/loongcollector:/loongcollector -w /loongcollector sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 bash -c "sleep infinity"
 
 ##2 进入容器
 docker exec -it -u root loongcollector-build-2.1.15 bash
@@ -11,8 +15,9 @@ docker exec -it -u root loongcollector-build-2.1.15 bash
 git submodule update --init
 mkdir -p core/build
 cd core/build
-cmake -DJAVA_HOME=/opt/jdk1.8.0_202 ..
+cmake -DJAVA_HOME=/opt/jdk1.8.0 ..
 make -sj$(nproc)
+
 
 ##4 编译go代码
 go mod tidy       # 若需要更新插件库
