@@ -6,7 +6,7 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-c
 docker run --name loongcollector-build-2.1.15 -d -v /home/shsnc/zhang/snc-agent-loogcollector-plugin/loongcollector:/loongcollector -w /loongcollector sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 bash -c "sleep infinity"
 
 #### aarch64
-docker run --name loongcollector-build-2.1.15 -d -v /Users/zhangchaozhi/data/github/loongcollector:/loongcollector -w /loongcollector sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 bash -c "sleep infinity"
+docker run --name loongcollector-build-2.1.15 -d -v /home/shsnc/zhang/snc-agent-loogcollector-plugin/loongcollector:/loongcollector -w /loongcollector sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 bash -c "sleep infinity"
 
 ##2 进入容器
 docker exec -it -u root loongcollector-build-2.1.15 bash
