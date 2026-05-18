@@ -22,12 +22,15 @@
 #include "application/Application.h"
 #include "common/ErrorUtil.h"
 #include "common/Flags.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/version.h"
 #include "logger/Logger.h"
 #include <iostream>
 #include <jni.h>
 #include <string>
 #include <sstream>
+#include <thread>
+#include <atomic>
 #include "com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor.h"
 #include "snc_agent.h"
 
@@ -43,6 +46,10 @@ static std::mutex g_jni_call_mutex;
 static jclass g_loongcollector_processor_class = nullptr;
 static jmethodID g_send_message_method = nullptr;
 static std::once_flag g_jni_init_flag;
+static std::thread g_jni_worker_thread;
+static std::atomic<bool> g_jni_worker_started(false);
+static std::atomic<bool> g_jni_stop_requested(false);
+static thread_local bool g_thread_attached_to_jvm = false;
 
 #ifdef ENABLE_COMPATIBLE_MODE
 extern "C" {
@@ -104,6 +111,15 @@ static void overwrite_community_edition_flags() {
     INT32_FLAG(data_server_port) = 443;
     BOOL_FLAG(enable_env_ref_in_config) = true;
     BOOL_FLAG(enable_sls_metrics_format) = false;
+}
+
+static void do_worker_process_for_jni() {
+    CreateAgentDir();
+    Logger::Instance().InitGlobalLoggers();
+    overwrite_community_edition_flags();
+    // In JNI/library mode, do not modify host JVM signal handlers or process-level limits.
+    Application::GetInstance()->Init();
+    Application::GetInstance()->Start();
 }
 
 // Main routine of worker process.
@@ -252,6 +268,16 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCol
     jboolean isCopy;
     const char *basePath = env->GetStringUTFChars(homePath, &isCopy); //UTF-8
 
+    STRING_FLAG(work_dir) = std::string(basePath);
+    STRING_FLAG(logtail_sys_conf_dir) = std::string(basePath) + "/conf";
+    STRING_FLAG(check_point_filename) = std::string(basePath) + "/checkpoint/logtail_check_point";
+    STRING_FLAG(default_buffer_file_path) = std::string(basePath) + "/checkpoint";
+    STRING_FLAG(ilogtail_docker_file_path_config) = std::string(basePath) + "/checkpoint/docker_path_config.json";
+    STRING_FLAG(metrics_report_method) = "";
+    INT32_FLAG(data_server_port) = 443;
+    BOOL_FLAG(enable_env_ref_in_config) = true;
+    BOOL_FLAG(enable_sls_metrics_format) = false;
+
     std::string workDir = "--work_dir=" + std::string(basePath);
     std::string conf = "--conf_dir=" + std::string(basePath) + "/conf";
     std::string logs = "--logs_dir=" + std::string(basePath) + "/logs";
@@ -277,14 +303,46 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCol
     {
         std::cout << "arg[" << i << "]: " << arg_array[i] << std::endl;
     }
+    google::ParseCommandLineFlags(&argc, &argv, true);
+    
+    
+    env->ReleaseStringUTFChars(homePath, basePath);
 
-    main(argc, argv);
-    std::cout << "Loongcollector main started" << std::endl;
+    if (g_jni_worker_started.load()) {
+        std::cout << "Loongcollector JNI worker already started" << std::endl;
+        return;
+    }
+
+    g_jni_stop_requested.store(false);
+    g_jni_worker_thread = std::thread([]() {
+        do_worker_process_for_jni();
+    });
+    g_jni_worker_thread.detach();
+    g_jni_worker_started.store(true);
+
+    std::cout << "Loongcollector JNI worker thread started" << std::endl;
 }
 
 JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCollectorProcessor_loogcollectorStop(JNIEnv *, jclass){
+    g_jni_stop_requested.store(true);
     Application::GetInstance()->SetSigTermSignalFlag(true);
+    if (g_jni_worker_started.load() && g_jni_worker_thread.joinable()) {
+        g_jni_worker_thread.join();
+    }
+    g_jni_worker_started.store(false);
     std::cout << "LoongcollectorProcessor stopped!" << std::endl;
+}
+
+// ============================
+//  JNI 线程附加/分离辅助
+// ============================
+static void detachThreadJNIEnv() {
+    if (!g_jvm || !g_thread_attached_to_jvm) {
+        return;
+    }
+    if (g_jvm->DetachCurrentThread() == JNI_OK) {
+        g_thread_attached_to_jvm = false;
+    }
 }
 
 // ============================
@@ -307,12 +365,15 @@ static JNIEnv* getThreadJNIEnv() {
         args.name = (char*)"shsnc-agent-sender";
         args.group = nullptr;
 
-        // 修复类型强转问题
         jint attach_ret = g_jvm->AttachCurrentThread((void**)&env, &args);
         if (attach_ret != 0) {
             std::cerr << "[SHSNC-JNI] AttachCurrentThread failed: " << attach_ret << std::endl;
             return nullptr;
         }
+        g_thread_attached_to_jvm = true;
+    } else if (result != JNI_OK) {
+        std::cerr << "[SHSNC-JNI] GetEnv failed: " << result << std::endl;
+        return nullptr;
     }
     return env;
 }
@@ -394,6 +455,7 @@ void sncAgentSendData(const char* data, int dataLen) {
 
     // 统一释放引用（关键：防止内存泄漏）
     if (j_bytes) env->DeleteLocalRef(j_bytes);
+    detachThreadJNIEnv();
 
     //std::cout << "[SHSNC-JNI] Finished sncAgentSendData" << std::endl;
 }
