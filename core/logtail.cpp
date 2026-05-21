@@ -280,7 +280,7 @@ JNIEXPORT void JNICALL Java_com_shsnc_agent_ivory_plugin_loongcollector_LoongCol
 
     std::string workDir = "--work_dir=" + std::string(basePath);
     std::string conf = "--conf_dir=" + std::string(basePath) + "/conf";
-    std::string logs = "--logs_dir=" + std::string(basePath) + "/logs";
+    std::string logs = "--logs_dir=" + std::string(basePath) + "/../../log";
     std::string data = "--data_dir=" + std::string(basePath) + "/data";
     std::string run = "--run_dir=" + std::string(basePath) + "/run";
     std::string third_party = "--third_party_dir=" + std::string(basePath) + "/third_party";

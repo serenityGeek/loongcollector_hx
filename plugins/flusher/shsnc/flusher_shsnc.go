@@ -161,7 +161,7 @@ func (p *FlusherShsnc) Flush(projectName string, logstoreName string, configName
 // ------------------------------
 func (p *FlusherShsnc) sendToShsnc(data []byte) {
 
-	logger.Info(p.context.GetRuntimeContext(), "sendToShsnc:", string(data))
+	logger.Debug(p.context.GetRuntimeContext(), "sendToShsnc:", string(data))
 	// 复制数据，避免内存被覆盖（防崩溃）
 	d := make([]byte, len(data))
 	copy(d, data)
@@ -208,7 +208,7 @@ func (p *FlusherShsnc) sendWorker() {
 			if len(data) == 0 {
 				return
 			}
-			logger.Info(p.context.GetRuntimeContext(), "sendWorker:", string(data))
+			logger.Debug(p.context.GetRuntimeContext(), "sendWorker:", string(data))
 
 			// 真正调用 JNI（只在这一个线程）
 			cData := (*C.char)(unsafe.Pointer(&data[0]))
